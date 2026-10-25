@@ -1,0 +1,2 @@
+# odd-length strings of a: unambiguous, but not LL(k) for any k
+S -> 'a' S 'a' | 'a'

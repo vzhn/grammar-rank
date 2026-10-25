@@ -1,5 +1,6 @@
 /* Tokenizer (longest match against the terminals, whitespace ignored) and
- * predictive LL(1) parser.  Both call die() on bad input. */
+ * the parser: predictive for LL(1) grammars, Earley otherwise.  Both call
+ * die() on bad input. */
 #ifndef PARSER_H
 #define PARSER_H
 #include "grammar.h"

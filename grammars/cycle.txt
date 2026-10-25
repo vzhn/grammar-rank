@@ -1,0 +1,2 @@
+# A derives itself: infinitely many derivations of every string
+A -> A | 'x'

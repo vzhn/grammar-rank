@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include "earley.h"
 #include "parser.h"
 #include "util.h"
 
@@ -71,6 +72,7 @@ static Node *parse_nt(Parser *p, int A)
 
 Node *parse(const Grammar *g, const Tokens *tk)
 {
+    if (!g->ll1_ok) return earley_parse(g, tk);
     Parser p = { g, tk, 0 };
     Node *n = parse_nt(&p, 0);
     if (p.pos != tk->n)

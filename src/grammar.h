@@ -55,9 +55,20 @@ typedef struct {
     unsigned char **first;       /* [nn][nt] */
     unsigned char **follow;      /* [nn][nt+1] */
     unsigned char **pred;        /* [np][nt+1] predict sets */
-    int ll1_ok;
     int finite;                  /* the language has finitely many strings */
     int max_size;                /* largest derivation size; finite languages only */
+
+    /* LL(1) verdict; the first conflict is kept for `check` */
+    int ll1_ok;
+    int conflict_nt, conflict_x, conflict_y, conflict_t;
+
+    /* for grammars that are not LL(1), filled by ambiguity_check */
+    int cyclic;                  /* a nonterminal that derives itself, or -1 */
+    int ambiguous;               /* the probe found two trees with the same yield */
+    char *ambig_string, *ambig_tree1, *ambig_tree2;
+    long probe_trees;            /* how many trees the probe examined */
+    int probe_size;              /* up to which derivation size */
+    int probe_exhaustive;        /* the probe enumerated the whole (finite) language */
 } Grammar;
 
 void grammar_load(Grammar *g, const char *path);

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "analysis.h"
+#include "ambiguity.h"
 #include "util.h"
 
 static unsigned char **alloc_sets(int rows, int cols)
@@ -94,23 +95,22 @@ static void compute_sets(Grammar *g)
     }
 }
 
-/* LL(1): predict sets of the alternatives of one nonterminal are disjoint */
+/* LL(1): predict sets of the alternatives of one nonterminal are disjoint;
+ * the first conflict is recorded for `check` */
 static void check_ll1(Grammar *g)
 {
     g->ll1_ok = 1;
+    g->conflict_nt = -1;
     for (int a = 0; a < g->nn; a++)
         for (int x = 0; x < g->pcount[a]; x++)
             for (int y = x + 1; y < g->pcount[a]; y++)
                 for (int t = 0; t <= g->nt; t++)
                     if (g->pred[g->plist[a][x]][t] && g->pred[g->plist[a][y]][t]) {
-                        if (g->ll1_ok) fprintf(stderr, "cfg: grammar is not LL(1):\n");
+                        if (g->ll1_ok) {
+                            g->conflict_nt = a; g->conflict_x = x; g->conflict_y = y; g->conflict_t = t;
+                        }
                         g->ll1_ok = 0;
-                        fprintf(stderr, "  %s: alternatives %d and %d both predicted by %s\n",
-                                g->ntname[a], x + 1, y + 1, t == g->nt ? "end of input" : g->tname[t]);
-                        if (g->generated[a] && (strstr(g->ntname[a], ".x") || strchr(g->ntname[a], '[')))
-                            fprintf(stderr, "  (this rule comes from an exception '-'; the difference is "
-                                    "context-free but not LL(1) here)\n");
-                        break;
+                        return;
                     }
 }
 
@@ -190,4 +190,5 @@ void analyze(Grammar *g)
     check_ll1(g);
     g->finite = !has_cycle(g);
     g->max_size = g->finite ? max_derivation_size(g) : 0;
+    ambiguity_check(g);
 }

@@ -1,0 +1,2 @@
+# the dangling else: ambiguous, so it must be refused
+S -> 'if' S | 'if' S 'else' S | 'x'
