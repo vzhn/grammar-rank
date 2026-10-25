@@ -15,8 +15,8 @@
  *     F  -> '(' E ')' | 'x'
  *     L  -> 'x' { ',' 'x' } [ ';' ]  ( 'a' | 'b' )+  'c'*  'd'?
  * Quoted text is a terminal, a bare identifier is a nonterminal, `eps` or an
- * empty alternative is the empty string, `|` separates alternatives, `->` or
- * `::=` separates sides.  EBNF operators: `( )` grouping, `[ ]` or `?`
+ * empty alternative is the empty string, `|` separates alternatives, `->`,
+ * `::=` or `=` separates sides, and a rule may end with `.` or `;`.  EBNF operators: `( )` grouping, `[ ]` or `?`
  * optional, `{ }` or `*` repetition, `+` one or more.  They are desugared into
  * generated nonterminals named Rule.gN / .oN / .rN / .pN, which `check` lists.
  * The first nonterminal is the start symbol.
@@ -124,7 +124,7 @@ static int add_terminal(const char *s, size_t len)
 
 /* grammar tokens */
 enum { TK_IDENT, TK_LIT, TK_ARROW, TK_BAR, TK_LPAR, TK_RPAR, TK_LBRK, TK_RBRK,
-       TK_LBRACE, TK_RBRACE, TK_STAR, TK_PLUS, TK_QMARK, TK_EOF };
+       TK_LBRACE, TK_RBRACE, TK_STAR, TK_PLUS, TK_QMARK, TK_END, TK_EOF };
 typedef struct { int kind; const char *s; size_t len; int line; } GTok;
 
 static GTok *gtok; static int ngtok;
@@ -148,6 +148,8 @@ static void scan_grammar(const char *text)
         else if (*p == '|') { t.kind = TK_BAR; t.len = 1; p++; }
         else if (p[0] == '-' && p[1] == '>') { t.kind = TK_ARROW; t.len = 2; p += 2; }
         else if (p[0] == ':' && p[1] == ':' && p[2] == '=') { t.kind = TK_ARROW; t.len = 3; p += 3; }
+        else if (*p == '=') { t.kind = TK_ARROW; t.len = 1; p++; }
+        else if (*p == '.' || *p == ';') { t.kind = TK_END; t.len = 1; p++; }
         else if (strchr(punct, *p)) { t.kind = punct_kind[strchr(punct, *p) - punct]; t.len = 1; p++; }
         else if (*p == '\'' || *p == '"') {
             char q = *p++;
@@ -243,7 +245,8 @@ static void parse_alts(int lhs, int tail);
 static int at_seq_end(void)
 {
     int k = gtok[gi].kind;
-    return k == TK_EOF || k == TK_BAR || k == TK_RPAR || k == TK_RBRK || k == TK_RBRACE || rule_starts_at(gi);
+    return k == TK_EOF || k == TK_END || k == TK_BAR || k == TK_RPAR || k == TK_RBRK || k == TK_RBRACE
+        || rule_starts_at(gi);
 }
 
 static void expect(int kind, const char *what)
@@ -371,6 +374,7 @@ static void load_grammar(const char *path)
         memset(gen_count, 0, sizeof gen_count);
         gi += 2;
         parse_alts(lhs, -1);
+        if (gtok[gi].kind == TK_END) gi++;   /* optional ISO-style terminator */
     }
 
     plist = xmalloc((size_t)NN * sizeof *plist);

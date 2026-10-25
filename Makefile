@@ -8,6 +8,7 @@ cfg: src/cfg.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
 
 test: cfg
+	sh tests/arithmetic.sh ./cfg
 	for g in $(GRAMMARS); do ./cfg selftest grammars/$$g.txt || exit 1; done
 
 clean:
