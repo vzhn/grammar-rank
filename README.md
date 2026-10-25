@@ -27,9 +27,9 @@ This is a recreational programming project. It started as the question
 closed de Bruijn terms, and then generalised to any LL(1) grammar.
 `grammars/lambda.ebnf` closes the loop: lambda terms in de Bruijn notation
 are one more grammar, open terms included, since "every index is below
-its binder depth" is not a context-free condition. There is nothing here that is
-not in the literature from the 1980s, but it was fun to build and the
-pieces fit together nicely.
+its binder depth" is not a context-free condition. There is nothing
+here that is not in the literature from the 1980s, but it was fun to
+build and the pieces fit together nicely.
 
 ## Building
 
