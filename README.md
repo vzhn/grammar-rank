@@ -335,8 +335,12 @@ grammar index of every spelling over a small alphabet.
 - Two adjacent loose-syntax symbols whose names concatenate to a defined
   nonterminal are read as that nonterminal, a consequence of accepting
   spaces inside ISO meta-identifiers.
-- Decoding builds the full counting table up to the size of the result, so
-  indices with thousands of digits take seconds and tens of megabytes.
+- Decoding builds the full counting table up to the size of the result,
+  and its cost grows roughly with the fourth power of the number of
+  digits: on `expr.txt` a 1000-digit index takes about three seconds and
+  a 2000-digit one about a minute. Convolutions run naively; fast
+  multiplication of whole count sequences would only pay off beyond a
+  few thousand digits.
 - Grammars that differ only in the order of alternatives have different
   shapes, as they have different numberings of their strings.
 

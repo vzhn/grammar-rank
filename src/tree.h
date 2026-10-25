@@ -15,7 +15,6 @@ typedef struct Node {
 Node *node_new(const Grammar *g, int nt, int prod);   /* kids are NULL until filled */
 void node_finish(Node *n);                            /* compute size once kids are set */
 void node_free(Node *n);
-Node *node_copy(const Node *n);
 int node_eq(const Node *a, const Node *b);
 
 int string_is_empty(const Grammar *g, const Node *n);      /* the tree yields no terminals */

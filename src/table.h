@@ -17,6 +17,8 @@ typedef struct {
     int built;      /* sizes 0..built-1 are computed */
     Tab *N;         /* [nn] */
     Tab **suf;      /* [np][m+1] */
+    Tab ***same;    /* [np][m+1]: an earlier production's suffix with the same
+                       nonterminals, whose values suf[p][i] copies, or NULL */
     mpz_t *off;     /* [built+1] */
 } Table;
 
