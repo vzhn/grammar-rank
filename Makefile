@@ -2,15 +2,13 @@ CC      = gcc
 CFLAGS  = -O2 -Wall -Wextra -std=gnu11
 LDLIBS  = -lgmp
 
-cfg: cfg.c
+GRAMMARS = expr dyck ebnf ops finite
+
+cfg: src/cfg.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
 
 test: cfg
-	./cfg selftest expr.txt
-	./cfg selftest dyck.txt
-	./cfg selftest ebnf.txt
-	./cfg selftest ops.txt
-	./cfg selftest finite.txt
+	for g in $(GRAMMARS); do ./cfg selftest grammars/$$g.txt || exit 1; done
 
 clean:
 	rm -f cfg
