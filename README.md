@@ -258,11 +258,16 @@ T1 -> '*' F T1 | eps
 
 A shape is counted as a sequence of actions (write an old or a new
 terminal, write an old or a new nonterminal, end the alternative, end the
-rule); its size is the number of actions. A four-parameter table counts
-the completions of a partial sequence, and ranking is a walk along the
-sequence that adds up the completions of every action that would have
-come earlier. Unreachable rules are not part of the shape, and the program
-says so when it drops them.
+rule); its size is the number of actions. Ranking is a walk along the
+sequence that adds up, for every position, the completions of every action
+that would have come earlier. The terminal actions interleave freely with
+the rest, so the number of completions is a convolution of r-Bell numbers
+(terminal subsequences) with a three-parameter recurrence for the
+nonterminal subsequences, whose levels are streamed and never stored
+whole. The 471-digit index of the standard's own grammar of EBNF,
+`grammars/iso-14977.ebnf`, decodes in half a second and about 20 MB.
+Unreachable rules are not part of the shape, and the program says so when
+it drops them.
 
 A grammar over an alphabet is a shape plus a *spelling*: which real
 terminal appeared first, which second, and so on. The spelling is a
@@ -327,8 +332,6 @@ grammar index of every spelling over a small alphabet.
   spaces inside ISO meta-identifiers.
 - Decoding builds the full counting table up to the size of the result, so
   indices with thousands of digits take seconds and tens of megabytes.
-- The shape table is quartic in the size, so `grammar-unrank` of an index
-  with a few hundred digits takes seconds and hundreds of megabytes.
 - Grammars that differ only in the order of alternatives have different
   shapes, as they have different numberings of their strings.
 

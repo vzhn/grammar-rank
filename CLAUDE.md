@@ -41,7 +41,7 @@ src/ambiguity.*  self-derivation check and the ambiguity probe
 src/rank.*       rank() and unrank()
 src/selftest.*   oracle checks and round trips
 src/shape.*      grammar shapes (names erased, first-occurrence numbering), canonicalizer, printer
-src/shapetable.* the four-parameter counting table C(n, m, r, k), unweighted or weighted by P(sigma, k)
+src/shapetable.* shape counts C(n, m, r, k) from r-Bell numbers and streamed columns of NT(b, m, r)
 src/shaperank.*  rank/unrank of shapes and of terminal spellings (k-permutations)
 src/shapecmd.*   the shape-* and grammar-* commands and `shape-selftest`
 src/main.c       command line and the `check` report

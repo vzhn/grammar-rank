@@ -221,14 +221,14 @@ static int selftest(int S, int sigma)
         shape_init(&cur);
         gen(&all, &cur, n, 0, 1, 0);
         shape_free(&cur);
-        if (mpz_cmp_ui(stab_at(&st, n, 0, 1, 0), (unsigned long)all.n) != 0) {
+        stab_total(&st, got, n);
+        if (mpz_cmp_ui(got, (unsigned long)all.n) != 0) {
             char buf[128];
-            snprintf(buf, sizeof buf, "size %d: table says %ld shapes, brute force %d", n,
-                     mpz_get_ui(stab_at(&st, n, 0, 1, 0)), all.n);
+            snprintf(buf, sizeof buf, "size %d: table says %ld shapes, brute force %d", n, mpz_get_ui(got), all.n);
             st_fail(&fails, buf, NULL);
         }
-        mpz_set(expect, st.off[n]);
-        mpz_set(gexpect, gt.off[n]);
+        mpz_set(expect, stab_off(&st, n));
+        mpz_set(gexpect, stab_off(&gt, n));
         for (int i = 0; i < all.n; i++) {
             const Shape *s = &all.v[i];
             shape_rank(&st, got, s);
@@ -243,8 +243,8 @@ static int selftest(int S, int sigma)
                 check_spellings(&fails, &gt, s, sigma, s->nt, 0, p, used, gexpect, got, rest, shape_part);
             }
         }
-        if (mpz_cmp(expect, st.off[n + 1]) != 0) st_fail(&fails, "shape offsets disagree with the enumeration", NULL);
-        if (mpz_cmp(gexpect, gt.off[n + 1]) != 0) st_fail(&fails, "grammar offsets disagree with the enumeration", NULL);
+        if (mpz_cmp(expect, stab_off(&st, n + 1)) != 0) st_fail(&fails, "shape offsets disagree with the enumeration", NULL);
+        if (mpz_cmp(gexpect, stab_off(&gt, n + 1)) != 0) st_fail(&fails, "grammar offsets disagree with the enumeration", NULL);
         total_shapes += all.n;
         total_grammars = (long)mpz_get_ui(gexpect);
         for (int i = 0; i < all.n; i++) shape_free(&all.v[i]);
@@ -367,12 +367,17 @@ int shape_commands(int argc, char **argv)
             stab_init(&st, -1);
             stab_ensure(&st, S);
             printf("size\tshapes\tgrammars\tfirst index\n");
-            for (int n = 0; n <= S; n++)
-                gmp_printf("%d\t%Zd\t%Zd\t%Zd\n", n, stab_at(&st, n, 0, 1, 0), stab_at(&t, n, 0, 1, 0), t.off[n]);
+            for (int n = 0; n <= S; n++) {
+                stab_total(&st, num, n);
+                stab_total(&t, rest, n);
+                gmp_printf("%d\t%Zd\t%Zd\t%Zd\n", n, num, rest, stab_off(&t, n));
+            }
         } else {
             printf("size\tshapes\tfirst index\n");
-            for (int n = 0; n <= S; n++)
-                gmp_printf("%d\t%Zd\t%Zd\n", n, stab_at(&t, n, 0, 1, 0), t.off[n]);
+            for (int n = 0; n <= S; n++) {
+                stab_total(&t, num, n);
+                gmp_printf("%d\t%Zd\t%Zd\n", n, num, stab_off(&t, n));
+            }
         }
         return 0;
     }
