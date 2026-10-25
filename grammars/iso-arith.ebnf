@@ -1,0 +1,9 @@
+(* Arithmetic expressions in strict ISO/IEC 14977 syntax:
+   commas between items, bracketed comments, meta-identifiers with
+   spaces, semicolon terminators.  Same structure as arithmetic.ebnf,
+   so every string gets the same index in both. *)
+expression    = term, { ( "+" | "-" ), term } ;
+term          = factor, { ( "*" | "/" ), factor } ;
+factor        = number | "(", expression, ")" ;
+number        = decimal digit, { decimal digit } ;
+decimal digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;

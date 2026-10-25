@@ -11,13 +11,13 @@ void tokenize(const Grammar *g, const char *s, Tokens *out)
     out->n = 0;
     size_t i = 0, n = strlen(s);
     while (i < n) {
-        if (isspace((unsigned char)s[i])) { i++; continue; }
         int best = -1;
         size_t bl = 0;
         for (int t = 0; t < g->nt; t++) {
             size_t l = strlen(g->tname[t]);
             if (l > bl && i + l <= n && !memcmp(s + i, g->tname[t], l)) { best = t; bl = l; }
         }
+        if (best < 0 && isspace((unsigned char)s[i])) { i++; continue; }
         if (best < 0) die("cannot tokenize input at offset %zu: '%s'", i, s + i);
         if (out->n == cap) { cap = cap ? 2 * cap : 32; out->v = xrealloc(out->v, (size_t)cap * sizeof *out->v); }
         out->v[out->n++] = best;

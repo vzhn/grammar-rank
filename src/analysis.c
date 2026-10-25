@@ -107,6 +107,9 @@ static void check_ll1(Grammar *g)
                         g->ll1_ok = 0;
                         fprintf(stderr, "  %s: alternatives %d and %d both predicted by %s\n",
                                 g->ntname[a], x + 1, y + 1, t == g->nt ? "end of input" : g->tname[t]);
+                        if (g->generated[a] && (strstr(g->ntname[a], ".x") || strchr(g->ntname[a], '[')))
+                            fprintf(stderr, "  (this rule comes from an exception '-'; the difference is "
+                                    "context-free but not LL(1) here)\n");
                         break;
                     }
 }

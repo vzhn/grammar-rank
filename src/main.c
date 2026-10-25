@@ -43,7 +43,8 @@ static int check(const Grammar *g, Table *tb)
     for (int a = 0; a < g->nn; a++) {
         printf("%s:%s%s%s%s\n", g->ntname[a], grammar_is_generated(g, a) ? " (generated)" : "",
                g->nullable[a] ? " nullable" : "",
-               g->productive[a] ? "" : " UNPRODUCTIVE", g->reachable[a] ? "" : " UNREACHABLE");
+               g->productive[a] ? "" : " UNPRODUCTIVE",
+               g->reachable[a] || g->in_exception[a] ? "" : " UNREACHABLE");
         printf("  first:  "); print_set(g, g->first[a], 0); putchar('\n');
         printf("  follow: "); print_set(g, g->follow[a], 1); putchar('\n');
         for (int k = 0; k < g->pcount[a]; k++) {

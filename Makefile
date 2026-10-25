@@ -6,7 +6,7 @@ SRCS    = $(wildcard src/*.c)
 OBJS    = $(SRCS:.c=.o)
 HDRS    = $(wildcard src/*.h)
 
-GRAMMARS = expr dyck ebnf ops finite
+GRAMMARS = expr.txt dyck.txt ebnf.txt ops.txt finite.txt iso-arith.ebnf exceptions.ebnf iso-14977.ebnf
 
 cfg: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDLIBS)
@@ -16,7 +16,8 @@ src/%.o: src/%.c $(HDRS)
 
 test: cfg
 	sh tests/arithmetic.sh ./cfg
-	for g in $(GRAMMARS); do ./cfg selftest grammars/$$g.txt || exit 1; done
+	sh tests/iso.sh ./cfg
+	for g in $(GRAMMARS); do ./cfg selftest grammars/$$g || exit 1; done
 
 clean:
 	rm -f cfg $(OBJS)
