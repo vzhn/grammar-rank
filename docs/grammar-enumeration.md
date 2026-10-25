@@ -113,14 +113,55 @@ C(n, m, r, k) =  k · C(n-1, m,   r,   k)        T j, old terminal
               +     C(n-1, m,   r-1, k)        ;        (only if r ≥ 1)
 ```
 
-The table has `O(n⁴)` entries, each a sum of six terms, so no convolution
-and no product; it is much cheaper than the string tables. The number of
+The table has `O(n⁴)` entries, each a sum of six terms. It is the simplest
+way to see that the count is well defined; the implementation computes the
+same numbers without storing it, see below. The number of
 shapes of size `n` is `C(n, 0, 1, 0)`, and the number of grammars over an alphabet of size `σ` comes from the
 same recurrence with the base case `C(0, m, 0, k) = P(σ, k)` instead of
 `1`: each completed shape is then counted once per spelling, and shapes
 with more than `σ` terminals contribute nothing. The weighted table also
 gives, during the rank walk, the number of grammars whose shape precedes
 the given one, which is what the composition in section 6 needs.
+
+### Counting without the table
+
+The four-parameter table is `O(n⁴)` in memory, which is tens of gigabytes
+for the shape of the ISO EBNF grammar (about 460 actions). It is not
+needed. The terminal actions interleave freely with the others, since only
+the final `;` has a fixed position, so
+
+```
+C(n, m, r, k) = Σ_a  binom(n-1, a) · R(a, k) · NT(n-a, m, r)
+```
+
+where `R(a, k)` counts sequences of `a` terminal actions started with `k`
+terminals introduced, and `NT(b, m, r)` counts sequences of `b`
+nonterminal actions (old or new nonterminal, `|`, `;`) that end exactly
+when the last owed rule is closed:
+
+```
+NT(0, m, 0) = 1,   NT(b, m, 0) = 0 for b > 0,
+NT(b, m, r) = (m+2) · NT(b-1, m, r) + NT(b-1, m+1, r+1) + NT(b-1, m, r-1)
+```
+
+For shapes `R(a, k) = Σ_i binom(a, i) kⁱ Bell(a-i)`, the r-Bell numbers:
+a terminal subsequence is a set partition of the positions that introduce
+or reuse new terminals, plus a free choice among the `k` old ones for the
+rest. Over an alphabet of size `σ` the weighted version is simply
+`R(a, k) = P(σ, k) · σᵃ`, since a spelled terminal subsequence is just a
+word over the alphabet.
+
+`NT` depends only on `(b, m, r)`, and its levels in `b` depend only on the
+previous level, so it is streamed: a pass keeps two `(m, r)` planes and
+records only the columns `NT(·, m, r)` that the rank or unrank walk will
+ask for. Ranking knows its walk in advance and marks all its states; unranking
+asks for a band of columns around the current state and runs another pass
+when the walk leaves it. A plane holds only states a shape can reach,
+`m ≤ N - b` and `2m + 1 - r ≤ N - b`. Each count then costs one
+convolution of length `n`, and the whole walk `O(n²)` big-number
+multiplications plus `O(n³)` additions per pass. The 471-digit index of
+the ISO EBNF grammar decodes in half a second and about 20 MB, where the
+table needed about a minute and tens of gigabytes.
 
 ### Rank and unrank
 

@@ -2,16 +2,38 @@
 #include "shaperank.h"
 #include "util.h"
 
+/* the (m, r) states of the walk and the columns their counts need */
+static void mark_walk(ShapeTable *t, const Shape *s)
+{
+    int m = 0, r = 1;
+    stab_mark(t, 0, 1, t->N);                  /* also serves the size offsets */
+    for (int i = 0; i < s->n; i++) {
+        int left = s->n - 1 - i;
+        stab_mark(t, m, r, left);
+        stab_mark(t, m + 1, r + 1, left);
+        stab_mark(t, m, r - 1, left);
+        const Action *a = &s->a[i];
+        if (a->kind == A_N && a->id == m + 1) { m++; r++; }
+        else if (a->kind == A_END) r--;
+    }
+}
+
 void shape_rank(ShapeTable *t, mpz_t out, const Shape *s)
 {
     int n = s->n, m = 0, r = 1, k = 0;
     stab_ensure(t, n);
-    mpz_set(out, t->off[n]);
+    stab_forget(t);
+    mark_walk(t, s);
+    stab_compute(t);
+    mpz_t same, x;
+    mpz_init(same);
+    mpz_init(x);
+    mpz_set(out, stab_off(t, n));
     for (int i = 0; i < n; i++) {
         int left = n - 1 - i;
         const Action *a = &s->a[i];
         if (r == 0) die("internal: shape continues after its last rule");
-        mpz_srcptr same = stab_at(t, left, m, r, k);       /* old terminal, old nonterminal, | */
+        stab_count(t, same, left, m, r, k);       /* old terminal, old nonterminal, | */
         switch (a->kind) {
         case A_T:
             if (a->id > k) die("internal: shape is not canonical");
@@ -21,20 +43,25 @@ void shape_rank(ShapeTable *t, mpz_t out, const Shape *s)
         case A_N:
             if (a->id > m + 1) die("internal: shape is not canonical");
             mpz_addmul_ui(out, same, (unsigned long)k);
-            mpz_add(out, out, stab_at(t, left, m, r, k + 1));
+            stab_count(t, x, left, m, r, k + 1);
+            mpz_add(out, out, x);
             mpz_addmul_ui(out, same, (unsigned long)a->id);
             if (a->id == m + 1) { m++; r++; }
             break;
         case A_BAR:
         case A_END:
             mpz_addmul_ui(out, same, (unsigned long)(k + m + 1));
-            mpz_add(out, out, stab_at(t, left, m, r, k + 1));
-            mpz_add(out, out, stab_at(t, left, m + 1, r + 1, k));
+            stab_count(t, x, left, m, r, k + 1);
+            mpz_add(out, out, x);
+            stab_count(t, x, left, m + 1, r + 1, k);
+            mpz_add(out, out, x);
             if (a->kind == A_END) { mpz_add(out, out, same); r--; }
             break;
         }
     }
     if (r != 0) die("internal: shape ends with %d rules missing", r);
+    mpz_clear(same);
+    mpz_clear(x);
 }
 
 /*
@@ -59,26 +86,31 @@ void shape_unrank(ShapeTable *t, mpz_t rest, const mpz_t num, Shape *s)
     int n = 0;
     for (;;) {
         stab_ensure(t, n);
-        if (mpz_cmp(num, t->off[n + 1]) < 0) break;
+        if (mpz_cmp(num, stab_off(t, n + 1)) < 0) break;
         n++;
     }
-    mpz_t rem, q, rr;
+    mpz_t rem, q, rr, same, x;
     mpz_init(rem);
     mpz_init(q);
     mpz_init(rr);
-    mpz_sub(rem, num, t->off[n]);
+    mpz_init(same);
+    mpz_init(x);
+    mpz_sub(rem, num, stab_off(t, n));
     shape_init(s);
     int m = 0, r = 1, k = 0;
     for (int i = 0; i < n; i++) {
         int left = n - 1 - i;
-        mpz_srcptr same = stab_at(t, left, m, r, k);
-        long x;
-        if ((x = pick(rem, same, k, q, rr)) >= 0) { shape_push(s, A_T, (int)x); continue; }
-        if (pick(rem, stab_at(t, left, m, r, k + 1), 1, q, rr) >= 0) { shape_push(s, A_T, k); k++; continue; }
-        if ((x = pick(rem, same, m + 1, q, rr)) >= 0) { shape_push(s, A_N, (int)x); continue; }
-        if (pick(rem, stab_at(t, left, m + 1, r + 1, k), 1, q, rr) >= 0) { shape_push(s, A_N, m + 1); m++; r++; continue; }
+        stab_count(t, same, left, m, r, k);
+        long y;
+        if ((y = pick(rem, same, k, q, rr)) >= 0) { shape_push(s, A_T, (int)y); continue; }
+        stab_count(t, x, left, m, r, k + 1);
+        if (pick(rem, x, 1, q, rr) >= 0) { shape_push(s, A_T, k); k++; continue; }
+        if ((y = pick(rem, same, m + 1, q, rr)) >= 0) { shape_push(s, A_N, (int)y); continue; }
+        stab_count(t, x, left, m + 1, r + 1, k);
+        if (pick(rem, x, 1, q, rr) >= 0) { shape_push(s, A_N, m + 1); m++; r++; continue; }
         if (pick(rem, same, 1, q, rr) >= 0) { shape_push(s, A_BAR, 0); continue; }
-        if (pick(rem, stab_at(t, left, m, r - 1, k), 1, q, rr) >= 0) { shape_push(s, A_END, 0); r--; continue; }
+        stab_count(t, x, left, m, r - 1, k);
+        if (pick(rem, x, 1, q, rr) >= 0) { shape_push(s, A_END, 0); r--; continue; }
         die("internal: unrank found no action at position %d", i);
     }
     if (r != 0 || mpz_cmp(rem, stab_base(t, k)) >= 0) die("internal: unrank left an incomplete shape");
@@ -86,6 +118,8 @@ void shape_unrank(ShapeTable *t, mpz_t rest, const mpz_t num, Shape *s)
     mpz_clear(rem);
     mpz_clear(q);
     mpz_clear(rr);
+    mpz_clear(same);
+    mpz_clear(x);
 }
 
 /* f = a (a-1) ... (a-b+1) */
