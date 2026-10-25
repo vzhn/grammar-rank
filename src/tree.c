@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdlib.h>
 #include "tree.h"
 #include "util.h"
@@ -56,21 +57,31 @@ int string_is_empty(const Grammar *g, const Node *n)
     return 1;
 }
 
-static void print_leaves(const Grammar *g, const Node *n, FILE *f, int *first)
+static void print_leaves(const Grammar *g, const Node *n, FILE *f, const char *sep, int *first)
 {
     const Prod *pr = &g->prod[n->prod];
     int ki = 0;
     for (int k = 0; k < pr->len; k++) {
-        if (pr->rhs[k].is_nt) { print_leaves(g, n->kids[ki++], f, first); continue; }
-        fprintf(f, *first ? "%s" : " %s", g->tname[pr->rhs[k].id]);
+        if (pr->rhs[k].is_nt) { print_leaves(g, n->kids[ki++], f, sep, first); continue; }
+        fprintf(f, "%s%s", *first ? "" : sep, g->tname[pr->rhs[k].id]);
         *first = 0;
     }
+}
+
+/* tokens are separated by a space, unless some terminal contains whitespace,
+ * in which case an added space could be read back as that terminal */
+static const char *separator(const Grammar *g)
+{
+    for (int t = 0; t < g->nt; t++)
+        for (const char *p = g->tname[t]; *p; p++)
+            if (isspace((unsigned char)*p)) return "";
+    return " ";
 }
 
 void print_string(const Grammar *g, const Node *n, FILE *f)
 {
     int first = 1;
-    print_leaves(g, n, f, &first);
+    print_leaves(g, n, f, separator(g), &first);
 }
 
 void print_tree(const Grammar *g, const Node *n, FILE *f)

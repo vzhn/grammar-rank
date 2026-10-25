@@ -1,0 +1,46 @@
+(* The syntax of Extended BNF written in itself, after ISO/IEC 14977
+   clause 8.1 (the final, abstract part).  The character set is reduced
+   to a handful of letters and digits so the terminal list stays short,
+   and special sequences are left out. *)
+syntax = syntax rule, { syntax rule } ;
+syntax rule = meta identifier, defining symbol, definitions list, terminator symbol ;
+definitions list = single definition, { definition separator symbol, single definition } ;
+single definition = syntactic term, { concatenate symbol, syntactic term } ;
+syntactic term = syntactic factor, [ except symbol, syntactic exception ] ;
+syntactic exception = syntactic factor ;
+syntactic factor = [ integer, repetition symbol ], syntactic primary ;
+syntactic primary = optional sequence | repeated sequence | grouped sequence
+                  | meta identifier | terminal string | empty sequence ;
+optional sequence = start option symbol, definitions list, end option symbol ;
+repeated sequence = start repeat symbol, definitions list, end repeat symbol ;
+grouped sequence = start group symbol, definitions list, end group symbol ;
+empty sequence = ;
+meta identifier = letter, { meta identifier character } ;
+meta identifier character = letter | decimal digit ;
+integer = decimal digit, { decimal digit } ;
+terminal string
+  = first quote symbol, first terminal character, { first terminal character }, first quote symbol
+  | second quote symbol, second terminal character, { second terminal character }, second quote symbol ;
+first terminal character = terminal character - first quote symbol ;
+second terminal character = terminal character - second quote symbol ;
+terminal character = letter | decimal digit | concatenate symbol | defining symbol
+                   | definition separator symbol | end group symbol | end option symbol
+                   | end repeat symbol | except symbol | first quote symbol | repetition symbol
+                   | second quote symbol | start group symbol | start option symbol
+                   | start repeat symbol | terminator symbol ;
+concatenate symbol = ',' ;
+defining symbol = '=' ;
+definition separator symbol = '|' ;
+end group symbol = ')' ;
+end option symbol = ']' ;
+end repeat symbol = '}' ;
+except symbol = '-' ;
+first quote symbol = "'" ;
+repetition symbol = '*' ;
+second quote symbol = '"' ;
+start group symbol = '(' ;
+start option symbol = '[' ;
+start repeat symbol = '{' ;
+terminator symbol = ';' ;
+letter = 'a' | 'b' | 'c' | 'd' | 'e' ;
+decimal digit = '0' | '1' | '2' ;

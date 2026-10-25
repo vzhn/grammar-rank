@@ -74,12 +74,15 @@ T -> F { '*' F }
 F -> '(' E ')' | 'x'
 ```
 
-ISO EBNF punctuation is accepted too:
+ISO/IEC 14977 syntax is accepted too, strict or relaxed:
 
 ```
-expression = term { ("+" | "-") term } .
-number     = digit { digit } .
-digit      = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" .
+(* commas, bracketed comments, multi-word names, semicolons *)
+expression    = term, { ( "+" | "-" ), term } ;
+number        = decimal digit, { decimal digit } ;
+decimal digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+consonant     = letter - vowel ;
+blanks        = 5 * " " ;
 ```
 
 The rules:
@@ -91,7 +94,14 @@ The rules:
   string.
 - `( )` groups, `[ ]` or a postfix `?` is optional, `{ }` or a postfix
   `*` repeats zero or more times, a postfix `+` repeats one or more times.
-- The first rule's nonterminal is the start symbol. `#` starts a comment.
+- The first rule's nonterminal is the start symbol. `#` starts a line
+  comment, `(* ... *)` a bracketed one, which may nest.
+- From ISO 14977: `,` may separate items, `/` and `!` mean `|`, `(/ /)`
+  and `(: :)` are the option and repeat brackets, `3 * x` repeats `x`
+  three times, and `x - y` is the exception, see below. Meta-identifiers
+  may contain spaces: `syntax rule` and `syntaxrule` are the same name,
+  as the standard specifies. Special sequences `? ... ?` are rejected,
+  since the standard gives them no meaning.
 
 Input strings are tokenized by longest match against the terminals, and
 whitespace between tokens is ignored, so `x+x` and `x + x` are the same
@@ -155,6 +165,25 @@ a+             E.p1 -> a E.r1
 `cfg check` prints the generated rules, and `--tree` shows them in
 derivations, so the numbering is always explainable.
 
+**Exceptions.** `factor - exception` denotes the strings of the factor
+that are not strings of the exception. A set difference of two
+context-free languages is not context-free in general, but the standard
+requires the exception to be expressible without meta-identifiers, which
+makes it regular, and a context-free language minus a regular one is
+context-free. The loader builds a finite automaton for the exception,
+complements it, and intersects the factor's sub-grammar with it: every
+nonterminal `B` of that sub-grammar becomes `B[p,q]`, a derivation whose
+yield drives the automaton from state `p` to state `q`. Because the
+automaton is deterministic, each original tree corresponds to exactly
+one product tree, so the product is unambiguous whenever the original
+is and counting works unchanged. The product can fail to be LL(1) even
+when the original was; `cfg check` then says so and names the rule. In
+practice character classes minus a few characters, as in
+`letter - vowel`, and repetition minus the empty sequence, as in
+`{ "A" }-`, stay LL(1). An exception that is itself recursive beyond
+tail recursion, such as a nested bracket language, is rejected as not
+regular.
+
 **Finite languages** are detected by a cycle check on the grammar graph.
 For them the program knows the total number of strings and rejects larger
 indices instead of searching forever.
@@ -172,16 +201,27 @@ round-trips indices 0 to 19999 and a few 13- to 50-digit numbers.
 
 `tests/arithmetic.sh` holds golden values for the ISO EBNF arithmetic
 grammar: counts, first strings, specific ranks and unranks, round trips,
-the tree view and rejected inputs.
+the tree view and rejected inputs. `tests/iso.sh` covers the ISO syntax:
+the strict and relaxed arithmetic grammars must agree on every index, the
+standard's repetition examples, exceptions, the standard's own grammar of
+EBNF from clause 8.1, alternative symbols, and a set of grammars that
+must be rejected, including the standard's ambiguous examples `cc` and
+`gg`.
 
 ## Limitations
 
 - Only LL(1) grammars. An unambiguous grammar that is not LL(1) would
-  work with a different parser, but the program does not have one.
+  work with a different parser, but the program does not have one yet
+  (issue 4). Exceptions whose product grammar is not LL(1) fall under
+  this.
 - The numbering is a property of the grammar text, not of the language.
 - Identifiers cannot contain a prime, so write `E1` rather than `E'`.
 - Output separates every token with a space, which makes `890` print as
-  `8 9 0` when digits are separate terminals.
+  `8 9 0` when digits are separate terminals. If some terminal contains
+  whitespace, tokens are printed without separators instead.
+- Two adjacent loose-syntax symbols whose names concatenate to a defined
+  nonterminal are read as that nonterminal, a consequence of accepting
+  spaces inside ISO meta-identifiers.
 - Decoding builds the full counting table up to the size of the result, so
   indices with thousands of digits take seconds and tens of megabytes.
 

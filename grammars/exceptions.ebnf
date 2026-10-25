@@ -1,0 +1,24 @@
+(* Repetition and exception examples, mostly from ISO/IEC 14977 clauses
+   5.7 and 5.8.  Each example is tagged so that they share one start
+   symbol.  The standard's cc, ff and gg are left out: they are
+   ambiguous, and `cfg check` rejects them (see tests/iso.sh). *)
+start = "aa:", aa | "bb:", bb | "dd:", dd | "ee:", ee
+      | "consonant:", consonant | "word:", word | "line:", line ;
+
+aa = "A" ;
+bb = 3 * aa, "B" ;
+dd = { aa }, "D" ;
+ee = aa, { aa }, "E" ;
+
+letter = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+       | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+vowel = "A" | "E" | "I" | "O" | "U" ;
+consonant = letter - vowel ;
+
+(* one or more A followed by E: the empty exception removes the empty repetition *)
+word = { "A" } -, "E" ;
+
+(* after the Fortran example in 4.22: two blanks, a character that is
+   neither blank nor zero, then anything *)
+line = 2 * " ", ( character - ( " " | "0" ) ), { character } ;
+character = letter | " " | "0" ;
