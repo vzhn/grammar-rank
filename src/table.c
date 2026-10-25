@@ -12,6 +12,26 @@ static void tab_grow(Tab *t, int need)
     t->cap = ncap;
 }
 
+/* suf[p][i] depends only on the nonterminals of p from position i on, so
+ * productions that end alike (E1 -> '+' T E1 | '-' T E1) need one
+ * convolution between them.  Tails of length one are a plain copy anyway. */
+static Tab *same_tail(Table *t, int p, int i)
+{
+    const Grammar *g = t->g;
+    const Prod *pr = &g->prod[p];
+    int len = pr->m - i;
+    if (len < 2) return NULL;
+    for (int q = 0; q < p; q++) {
+        const Prod *qr = &g->prod[q];
+        int k = qr->m - len;
+        if (k < 0) continue;
+        int x = 0;
+        while (x < len && qr->rhs[qr->ntpos[k + x]].id == pr->rhs[pr->ntpos[i + x]].id) x++;
+        if (x == len) return t->same[q][k] ? t->same[q][k] : &t->suf[q][k];
+    }
+    return NULL;
+}
+
 void table_init(Table *t, const Grammar *g)
 {
     t->g = g;
@@ -19,6 +39,11 @@ void table_init(Table *t, const Grammar *g)
     t->N = xcalloc((size_t)g->nn, sizeof *t->N);
     t->suf = xmalloc((size_t)g->np * sizeof *t->suf);
     for (int p = 0; p < g->np; p++) t->suf[p] = xcalloc((size_t)g->prod[p].m + 1, sizeof(Tab));
+    t->same = xmalloc((size_t)g->np * sizeof *t->same);
+    for (int p = 0; p < g->np; p++) {
+        t->same[p] = xmalloc(((size_t)g->prod[p].m + 1) * sizeof **t->same);
+        for (int i = 0; i <= g->prod[p].m; i++) t->same[p][i] = same_tail(t, p, i);
+    }
     t->off = xmalloc(sizeof *t->off);
     mpz_init_set_ui(t->off[0], 0);
 }
@@ -34,8 +59,6 @@ void table_ensure(Table *t, int S)
     for (int p = 0; p < g->np; p++)
         for (int i = 0; i <= g->prod[p].m; i++) tab_grow(&t->suf[p][i], S + 1);
 
-    mpz_t tmp;
-    mpz_init(tmp);
     for (int s = t->built; s <= S; s++) {
         /* N_A(s) = sum over productions of A of suf[p][0](s - 1) */
         for (int a = 0; a < g->nn; a++) {
@@ -45,7 +68,10 @@ void table_ensure(Table *t, int S)
             for (int k = 0; k < g->pcount[a]; k++)
                 mpz_add(v, v, t->suf[g->plist[a][k]][0].v[s - 1]);
         }
-        /* suf[p][i](s) = sum over j of N_X(j) * suf[p][i+1](s - j), X the i-th nonterminal */
+        /* suf[p][i](s) = sum over j of N_X(j) * suf[p][i+1](s - j), X the i-th
+         * nonterminal.  suf[p][m] is 1 at size 0 and 0 elsewhere, so the last
+         * nonterminal's suffix is just N_X; tails seen in an earlier production
+         * are copied (same_tail), and terms with a zero factor are skipped. */
         for (int p = 0; p < g->np; p++) {
             const Prod *pr = &g->prod[p];
             Tab *suf = t->suf[p];
@@ -53,15 +79,16 @@ void table_ensure(Table *t, int S)
             for (int i = pr->m - 1; i >= 0; i--) {
                 int X = pr->rhs[pr->ntpos[i]].id;
                 mpz_ptr v = suf[i].v[s];
+                if (t->same[p][i]) { mpz_set(v, t->same[p][i]->v[s]); continue; }
+                if (i == pr->m - 1) { mpz_set(v, t->N[X].v[s]); continue; }
                 mpz_set_ui(v, 0);
                 for (int j = 1; j <= s; j++) {
-                    mpz_mul(tmp, t->N[X].v[j], suf[i + 1].v[s - j]);
-                    mpz_add(v, v, tmp);
+                    mpz_srcptr a = t->N[X].v[j], b = suf[i + 1].v[s - j];
+                    if (mpz_sgn(a) && mpz_sgn(b)) mpz_addmul(v, a, b);
                 }
             }
         }
         mpz_add(t->off[s + 1], t->off[s], t->N[0].v[s]);
     }
-    mpz_clear(tmp);
     t->built = S + 1;
 }

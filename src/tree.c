@@ -31,14 +31,6 @@ void node_free(Node *n)
     free(n);
 }
 
-Node *node_copy(const Node *n)
-{
-    Node *c = alloc_node(n->nt, n->prod, n->nkids);
-    for (int i = 0; i < n->nkids; i++) c->kids[i] = node_copy(n->kids[i]);
-    c->size = n->size;
-    return c;
-}
-
 int node_eq(const Node *a, const Node *b)
 {
     if (a->nt != b->nt || a->prod != b->prod) return 0;

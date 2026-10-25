@@ -10,7 +10,8 @@
 typedef struct { Node **v; size_t n, cap; } TreeList;
 
 /* every derivation tree rooted at A with s applications, in the order the
- * numbering uses; owned by the enumerator, valid until exit */
+ * numbering uses; owned by the enumerator, valid until exit.  Subtrees are
+ * shared between trees, so callers must not modify or free them. */
 const TreeList *enumerate(const Grammar *g, int A, int s);
 
 #endif

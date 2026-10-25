@@ -13,7 +13,10 @@ static void vec_push(Vec *v, void *x)
 
 static struct { TreeList **memo; unsigned char **done; int *cap; const Grammar *g; } M;
 
-/* all ways to fill kids i.. of production p with t applications; each result is a Node*[m] */
+/* all ways to fill kids i.. of production p with t applications; each result
+ * is a Node*[m].  Memoized trees are never modified or freed, so a tree
+ * points at its children's memoized trees instead of copying them: the trees
+ * form a DAG and cost one node each. */
 static void gen_suf(const Grammar *g, Vec *out, int p, int i, int t)
 {
     const Prod *pr = &g->prod[p];
@@ -31,15 +34,11 @@ static void gen_suf(const Grammar *g, Vec *out, int p, int i, int t)
             for (size_t b = 0; b < rests.n; b++) {
                 Node **arr = xcalloc((size_t)pr->m + 1, sizeof *arr);
                 Node **rest = rests.v[b];
-                for (int k = i + 1; k < pr->m; k++) arr[k] = node_copy(rest[k]);
-                arr[i] = node_copy(kids->v[a]);
+                for (int k = i + 1; k < pr->m; k++) arr[k] = rest[k];
+                arr[i] = kids->v[a];
                 vec_push(out, arr);
             }
-        for (size_t b = 0; b < rests.n; b++) {
-            Node **arr = rests.v[b];
-            for (int k = i + 1; k < pr->m; k++) node_free(arr[k]);
-            free(arr);
-        }
+        for (size_t b = 0; b < rests.n; b++) free(rests.v[b]);
         free(rests.v);
     }
 }
