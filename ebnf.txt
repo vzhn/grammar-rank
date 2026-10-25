@@ -1,0 +1,4 @@
+# arithmetic expressions in EBNF
+E -> T { '+' T }
+T -> F { '*' F }
+F -> '(' E ')' | 'x'

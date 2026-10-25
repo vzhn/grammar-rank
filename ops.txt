@@ -1,0 +1,2 @@
+# every EBNF operator at once
+S -> 'a'? ( 'b' | 'c' )+ [ 'd' ] { 'e' 'f' } 'g'*

@@ -13,9 +13,13 @@
  *     E  -> T E1
  *     E1 -> '+' T E1 | eps
  *     F  -> '(' E ')' | 'x'
+ *     L  -> 'x' { ',' 'x' } [ ';' ]  ( 'a' | 'b' )+  'c'*  'd'?
  * Quoted text is a terminal, a bare identifier is a nonterminal, `eps` or an
  * empty alternative is the empty string, `|` separates alternatives, `->` or
- * `::=` separates sides.  The first nonterminal is the start symbol.
+ * `::=` separates sides.  EBNF operators: `( )` grouping, `[ ]` or `?`
+ * optional, `{ }` or `*` repetition, `+` one or more.  They are desugared into
+ * generated nonterminals named Rule.gN / .oN / .rN / .pN, which `check` lists.
+ * The first nonterminal is the start symbol.
  * Input strings are tokenized by longest match against the terminals;
  * whitespace between tokens is ignored.
  *
@@ -119,13 +123,17 @@ static int add_terminal(const char *s, size_t len)
 }
 
 /* grammar tokens */
-enum { TK_IDENT, TK_LIT, TK_ARROW, TK_BAR, TK_EOF };
+enum { TK_IDENT, TK_LIT, TK_ARROW, TK_BAR, TK_LPAR, TK_RPAR, TK_LBRK, TK_RBRK,
+       TK_LBRACE, TK_RBRACE, TK_STAR, TK_PLUS, TK_QMARK, TK_EOF };
 typedef struct { int kind; const char *s; size_t len; int line; } GTok;
 
 static GTok *gtok; static int ngtok;
 
 static void scan_grammar(const char *text)
 {
+    static const char punct[] = "()[]{}*+?";
+    static const int punct_kind[] = { TK_LPAR, TK_RPAR, TK_LBRK, TK_RBRK, TK_LBRACE, TK_RBRACE,
+                                      TK_STAR, TK_PLUS, TK_QMARK };
     int cap = 0, line = 1;
     const char *p = text;
     for (;;) {
@@ -140,6 +148,7 @@ static void scan_grammar(const char *text)
         else if (*p == '|') { t.kind = TK_BAR; t.len = 1; p++; }
         else if (p[0] == '-' && p[1] == '>') { t.kind = TK_ARROW; t.len = 2; p += 2; }
         else if (p[0] == ':' && p[1] == ':' && p[2] == '=') { t.kind = TK_ARROW; t.len = 3; p += 3; }
+        else if (strchr(punct, *p)) { t.kind = punct_kind[strchr(punct, *p) - punct]; t.len = 1; p++; }
         else if (*p == '\'' || *p == '"') {
             char q = *p++;
             const char *s = p;
@@ -167,6 +176,171 @@ static int rule_starts_at(int i)
     return gtok[i].kind == TK_IDENT && gtok[i + 1].kind == TK_ARROW;
 }
 
+static int add_nonterminal(const char *s, size_t len)
+{
+    ntname = xrealloc(ntname, (size_t)(NN + 1) * sizeof *ntname);
+    ntname[NN] = xstrndup(s, len);
+    return NN++;
+}
+
+static void add_prod(Prod *pr)
+{
+    pr->m = 0;
+    for (int k = 0; k < pr->len; k++) if (pr->rhs[k].is_nt) pr->ntpos[pr->m++] = k;
+    prod = xrealloc(prod, (size_t)(NP + 1) * sizeof *prod);
+    prod[NP++] = *pr;
+}
+
+static void add_eps(int lhs)
+{
+    Prod pr;
+    memset(&pr, 0, sizeof pr);
+    pr.lhs = lhs;
+    add_prod(&pr);
+}
+
+static void add_unary(int lhs, Ref x, int tail)   /* lhs -> x [tail] */
+{
+    Prod pr;
+    memset(&pr, 0, sizeof pr);
+    pr.lhs = lhs;
+    pr.rhs[pr.len++] = x;
+    if (tail >= 0) pr.rhs[pr.len++] = (Ref){ 1, tail };
+    add_prod(&pr);
+}
+
+/*
+ * EBNF is desugared while reading.  Generated nonterminals are named after
+ * the rule they occur in:  X.gN group, X.oN option, X.rN repetition, X.pN plus.
+ *   ( a | b )      X.g -> a | b
+ *   [ a ] , a?     X.o -> eps | a
+ *   { a } , a*     X.r -> eps | a X.r
+ *   a+             X.p -> a X.r        with X.r as above
+ * The empty alternative always comes first, so at equal size fewer
+ * iterations precede more.
+ */
+static int gi;                 /* token cursor */
+static const char *cur_rule;   /* rule being read; base for generated names */
+static int gen_count[4];
+
+static int fresh(char kind)
+{
+    static const char kinds[] = "gorp";
+    int *c = &gen_count[strchr(kinds, kind) - kinds];
+    char buf[256];
+    snprintf(buf, sizeof buf, "%s.%c%d", cur_rule, kind, ++*c);
+    return add_nonterminal(buf, strlen(buf));
+}
+
+static void tok_error(const GTok *t, const char *what)
+{
+    if (t->kind == TK_EOF) die("line %d: %s, found end of input", t->line, what);
+    die("line %d: %s, found '%.*s'", t->line, what, (int)t->len, t->s);
+}
+
+static void parse_alts(int lhs, int tail);
+
+static int at_seq_end(void)
+{
+    int k = gtok[gi].kind;
+    return k == TK_EOF || k == TK_BAR || k == TK_RPAR || k == TK_RBRK || k == TK_RBRACE || rule_starts_at(gi);
+}
+
+static void expect(int kind, const char *what)
+{
+    if (gtok[gi].kind != kind) tok_error(&gtok[gi], what);
+    gi++;
+}
+
+static Ref parse_atom(void)
+{
+    GTok *t = &gtok[gi++];
+    switch (t->kind) {
+    case TK_LIT:
+        return (Ref){ 0, add_terminal(t->s, t->len) };
+    case TK_IDENT: {
+        int id = find_name(ntname, NN, t->s, t->len);
+        if (id < 0) die("line %d: undefined nonterminal '%.*s' (quote it if it is a terminal)",
+                        t->line, (int)t->len, t->s);
+        return (Ref){ 1, id };
+    }
+    case TK_LPAR: {
+        int g = fresh('g');
+        parse_alts(g, -1);
+        expect(TK_RPAR, "expected ')'");
+        return (Ref){ 1, g };
+    }
+    case TK_LBRK: {
+        int o = fresh('o');
+        add_eps(o);
+        parse_alts(o, -1);
+        expect(TK_RBRK, "expected ']'");
+        return (Ref){ 1, o };
+    }
+    case TK_LBRACE: {
+        int r = fresh('r');
+        add_eps(r);
+        parse_alts(r, r);
+        expect(TK_RBRACE, "expected '}'");
+        return (Ref){ 1, r };
+    }
+    default:
+        gi--;
+        tok_error(t, "expected a symbol or group");
+    }
+    return (Ref){ 0, 0 };
+}
+
+static Ref parse_factor(void)
+{
+    Ref x = parse_atom();
+    int k = gtok[gi].kind;
+    if (k == TK_QMARK) {
+        gi++;
+        int o = fresh('o');
+        add_eps(o);
+        add_unary(o, x, -1);
+        return (Ref){ 1, o };
+    }
+    if (k == TK_STAR || k == TK_PLUS) {
+        gi++;
+        int r = fresh('r');
+        add_eps(r);
+        add_unary(r, x, r);
+        if (k == TK_STAR) return (Ref){ 1, r };
+        int p = fresh('p');
+        add_unary(p, x, r);
+        return (Ref){ 1, p };
+    }
+    return x;
+}
+
+static void parse_seq(int lhs, int tail)
+{
+    Prod pr;
+    memset(&pr, 0, sizeof pr);
+    pr.lhs = lhs;
+    int saw_eps = 0;
+    while (!at_seq_end()) {
+        GTok *t = &gtok[gi];
+        if (t->kind == TK_IDENT && t->len == 3 && !memcmp(t->s, "eps", 3)) { saw_eps = 1; gi++; continue; }
+        if (pr.len + (tail >= 0) >= MAXRHS) die("line %d: right-hand side too long", t->line);
+        pr.rhs[pr.len++] = parse_factor();
+    }
+    if (saw_eps && pr.len) die("line %d: 'eps' mixed with other symbols", gtok[gi - 1].line);
+    if (tail >= 0) pr.rhs[pr.len++] = (Ref){ 1, tail };
+    add_prod(&pr);
+}
+
+static void parse_alts(int lhs, int tail)
+{
+    for (;;) {
+        parse_seq(lhs, tail);
+        if (gtok[gi].kind != TK_BAR) return;
+        gi++;
+    }
+}
+
 static void load_grammar(const char *path)
 {
     FILE *f = fopen(path, "rb");
@@ -183,46 +357,20 @@ static void load_grammar(const char *path)
     /* pass 1: nonterminals are the identifiers on a left-hand side */
     for (int i = 0; i + 1 < ngtok; i++) {
         if (!rule_starts_at(i)) continue;
-        if (find_name(ntname, NN, gtok[i].s, gtok[i].len) < 0) {
-            ntname = xrealloc(ntname, (size_t)(NN + 1) * sizeof *ntname);
-            ntname[NN++] = xstrndup(gtok[i].s, gtok[i].len);
-        }
+        if (find_name(ntname, NN, gtok[i].s, gtok[i].len) < 0)
+            add_nonterminal(gtok[i].s, gtok[i].len);
     }
     if (NN == 0) die("%s: no rules found", path);
 
-    /* pass 2: productions */
-    int i = 0;
-    if (!rule_starts_at(0)) die("line %d: expected 'Name ->'", gtok[0].line);
-    while (gtok[i].kind != TK_EOF) {
-        int lhs = find_name(ntname, NN, gtok[i].s, gtok[i].len);
-        i += 2;
-        for (;;) {
-            Prod pr;
-            memset(&pr, 0, sizeof pr);
-            pr.lhs = lhs;
-            int saw_eps = 0;
-            while (gtok[i].kind != TK_EOF && gtok[i].kind != TK_BAR && !rule_starts_at(i)) {
-                GTok *t = &gtok[i++];
-                if (t->kind == TK_ARROW) die("line %d: unexpected '->'", t->line);
-                if (pr.len == MAXRHS) die("line %d: right-hand side too long", t->line);
-                if (t->kind == TK_IDENT) {
-                    if (t->len == 3 && !memcmp(t->s, "eps", 3)) { saw_eps = 1; continue; }
-                    int id = find_name(ntname, NN, t->s, t->len);
-                    if (id < 0) die("line %d: undefined nonterminal '%.*s' (quote it if it is a terminal)",
-                                    t->line, (int)t->len, t->s);
-                    pr.rhs[pr.len++] = (Ref){ 1, id };
-                } else {
-                    pr.rhs[pr.len++] = (Ref){ 0, add_terminal(t->s, t->len) };
-                }
-            }
-            if (saw_eps && pr.len) die("line %d: 'eps' mixed with other symbols", gtok[i - 1].line);
-            for (int k = 0; k < pr.len; k++)
-                if (pr.rhs[k].is_nt) pr.ntpos[pr.m++] = k;
-            prod = xrealloc(prod, (size_t)(NP + 1) * sizeof *prod);
-            prod[NP++] = pr;
-            if (gtok[i].kind == TK_BAR) { i++; continue; }
-            break;
-        }
+    /* pass 2: productions, desugaring EBNF on the way */
+    gi = 0;
+    while (gtok[gi].kind != TK_EOF) {
+        if (!rule_starts_at(gi)) tok_error(&gtok[gi], "expected 'Name ->'");
+        int lhs = find_name(ntname, NN, gtok[gi].s, gtok[gi].len);
+        cur_rule = ntname[lhs];
+        memset(gen_count, 0, sizeof gen_count);
+        gi += 2;
+        parse_alts(lhs, -1);
     }
 
     plist = xmalloc((size_t)NN * sizeof *plist);
@@ -875,7 +1023,8 @@ static int check(void)
     for (int t = 0; t < NT; t++) printf(" '%s'", tname[t]);
     printf("\n\n");
     for (int a = 0; a < NN; a++) {
-        printf("%s:%s%s%s\n", ntname[a], nullable[a] ? " nullable" : "",
+        printf("%s:%s%s%s%s\n", ntname[a], strchr(ntname[a], '.') ? " (generated)" : "",
+               nullable[a] ? " nullable" : "",
                productive[a] ? "" : " UNPRODUCTIVE", reachable[a] ? "" : " UNREACHABLE");
         printf("  first:  "); print_set(first[a], 0); putchar('\n');
         printf("  follow: "); print_set(follow[a], 1); putchar('\n');

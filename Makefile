@@ -8,6 +8,9 @@ cfg: cfg.c
 test: cfg
 	./cfg selftest expr.txt
 	./cfg selftest dyck.txt
+	./cfg selftest ebnf.txt
+	./cfg selftest ops.txt
+	./cfg selftest finite.txt
 
 clean:
 	rm -f cfg
