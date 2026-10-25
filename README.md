@@ -107,11 +107,16 @@ Input strings are tokenized by longest match against the terminals, and
 whitespace between tokens is ignored, so `x+x` and `x + x` are the same
 string.
 
-The grammar must be LL(1). `cfg check` tells you whether it is and, if
-not, which alternatives conflict on which token. Left recursion and
-ambiguity both fail that test. LL(1) is stronger than strictly necessary,
-since the method only needs unambiguity, but it is easy to check and it
-gives a fast parser for free.
+The grammar must be unambiguous. `cfg check` first tests whether it is
+LL(1), which guarantees unambiguity and gives a fast predictive parser.
+If it is not, for example because it is left-recursive, the grammar is
+still accepted provided it survives two checks: no nonterminal may derive
+itself, and a brute-force probe over the first couple of thousand
+derivation trees must find no two trees with the same string. Strings of
+such a grammar are parsed with an Earley parser, which also refuses any
+string that turns out to have two derivations. `cfg check` reports which
+case applies, and when a grammar is refused it prints the offending
+string with both of its derivations.
 
 ## How the numbering works
 
@@ -184,9 +189,25 @@ practice character classes minus a few characters, as in
 tail recursion, such as a nested bracket language, is rejected as not
 regular.
 
+**Beyond LL(1).** Unambiguity is undecidable in general, so for a grammar
+that fails the LL(1) test the program cannot prove the numbering is a
+bijection. It does the next best thing. A grammar in which some
+nonterminal derives itself through unit and nullable productions gives
+every string infinitely many derivations and is refused outright. Any
+other grammar is probed: derivation trees are enumerated by brute force,
+about two thousand of them, and if two have the same yield the grammar is
+refused with that string and both trees as the witness. Practical
+ambiguities such as `E -> E '+' E` or the dangling else fall within the
+first few hundred trees. A grammar that passes is parsed with Earley's
+algorithm, which keeps every way an item was reached and so notices when a
+string has more than one derivation, refusing it. The weak spot is
+`unrank`, which cannot notice ambiguity; the self-test closes it for small
+sizes by checking that all enumerated trees have distinct strings.
+
 **Finite languages** are detected by a cycle check on the grammar graph.
 For them the program knows the total number of strings and rejects larger
-indices instead of searching forever.
+indices instead of searching forever. For a finite language that is not
+LL(1) the ambiguity probe is exhaustive, so its verdict is a proof.
 
 ## Testing
 
@@ -206,14 +227,20 @@ the strict and relaxed arithmetic grammars must agree on every index, the
 standard's repetition examples, exceptions, the standard's own grammar of
 EBNF from clause 8.1, alternative symbols, and a set of grammars that
 must be rejected, including the standard's ambiguous examples `cc` and
-`gg`.
+`gg`. `tests/earley.sh` covers the non-LL(1) path: a left-recursive
+expression grammar, which accepts the same strings as `expr.txt` under a
+different numbering, odd palindromes, and the grammars that must be
+refused with their witnesses.
 
 ## Limitations
 
-- Only LL(1) grammars. An unambiguous grammar that is not LL(1) would
-  work with a different parser, but the program does not have one yet
-  (issue 4). Exceptions whose product grammar is not LL(1) fall under
-  this.
+- For a grammar that is not LL(1), unambiguity is checked only up to the
+  probe's bound and at `rank` time. An ambiguity that first appears in
+  large strings would make `unrank` return the same string for two
+  indices without warning.
+- The Earley parser is cubic in the length of the input in the worst case
+  and uses linear scans inside item sets, so strings of thousands of
+  tokens are slow.
 - The numbering is a property of the grammar text, not of the language.
 - Identifiers cannot contain a prime, so write `E1` rather than `E'`.
 - Output separates every token with a space, which makes `890` print as

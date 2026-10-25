@@ -1,3 +1,4 @@
+#define _GNU_SOURCE   /* open_memstream */
 #include <ctype.h>
 #include <stdlib.h>
 #include "tree.h"
@@ -55,6 +56,26 @@ int string_is_empty(const Grammar *g, const Node *n)
         if (!string_is_empty(g, n->kids[ki++])) return 0;
     }
     return 1;
+}
+
+static void yield_ids(const Grammar *g, const Node *n, FILE *f)
+{
+    const Prod *pr = &g->prod[n->prod];
+    int ki = 0;
+    for (int k = 0; k < pr->len; k++) {
+        if (pr->rhs[k].is_nt) yield_ids(g, n->kids[ki++], f);
+        else fprintf(f, "%d,", pr->rhs[k].id);
+    }
+}
+
+char *yield_key(const Grammar *g, const Node *n)
+{
+    char *buf = NULL;
+    size_t len = 0;
+    FILE *f = open_memstream(&buf, &len);
+    yield_ids(g, n, f);
+    fclose(f);
+    return buf;
 }
 
 static void print_leaves(const Grammar *g, const Node *n, FILE *f, const char *sep, int *first)

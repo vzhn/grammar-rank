@@ -1,0 +1,5 @@
+# arithmetic expressions written left-recursively, as for an LR parser;
+# not LL(1), so strings are parsed with Earley
+E -> E '+' T | T
+T -> T '*' F | F
+F -> '(' E ')' | 'x'

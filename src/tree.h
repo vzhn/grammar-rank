@@ -19,6 +19,7 @@ Node *node_copy(const Node *n);
 int node_eq(const Node *a, const Node *b);
 
 int string_is_empty(const Grammar *g, const Node *n);      /* the tree yields no terminals */
+char *yield_key(const Grammar *g, const Node *n);          /* malloc'd "id,id,...": equal iff same string */
 void print_string(const Grammar *g, const Node *n, FILE *f);
 void print_tree(const Grammar *g, const Node *n, FILE *f);
 

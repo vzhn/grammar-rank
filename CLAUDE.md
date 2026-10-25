@@ -34,11 +34,14 @@ src/grammar.*    Grammar struct, scanner, EBNF desugaring, grammar_load()
 src/analysis.*   nullable, FIRST, FOLLOW, predict sets, LL(1) check, finiteness
 src/table.*      Table struct: GMP counting tables, table_ensure()
 src/tree.*       derivation trees, printing
-src/parser.*     tokenizer and predictive parser
+src/parser.*     tokenizer, predictive parser, dispatch to Earley
+src/earley.*     Earley parser for grammars that are not LL(1)
+src/enumerate.*  brute-force enumeration of derivation trees (memoized)
+src/ambiguity.*  self-derivation check and the ambiguity probe
 src/rank.*       rank() and unrank()
-src/selftest.*   brute-force oracle and round trips
+src/selftest.*   oracle checks and round trips
 src/main.c       command line and the `check` report
-grammars/        example grammars; ambig.txt is deliberately not LL(1)
+grammars/        example grammars; ambig.txt, dangling.txt and cycle.txt are deliberately refused
 tests/           shell tests with golden values
 ```
 

@@ -25,6 +25,11 @@
 #include "tree.h"
 #include "util.h"
 
+static int usable(const Grammar *g)
+{
+    return g->ll1_ok || (g->cyclic < 0 && !g->ambiguous);
+}
+
 static void print_set(const Grammar *g, const unsigned char *set, int with_end)
 {
     int any = 0;
@@ -58,7 +63,31 @@ static int check(const Grammar *g, Table *tb)
             printf("   predict: "); print_set(g, g->pred[p], 1); putchar('\n');
         }
     }
-    printf("\nLL(1): %s\n", g->ll1_ok ? "yes" : "NO");
+    if (g->ll1_ok) {
+        printf("\nLL(1): yes\n");
+    } else {
+        int a = g->conflict_nt, t = g->conflict_t;
+        printf("\nLL(1): no (%s: alternatives %d and %d both predicted by %s)\n",
+               g->ntname[a], g->conflict_x + 1, g->conflict_y + 1,
+               t == g->nt ? "end of input" : g->tname[t]);
+        if (g->generated[a] && (strstr(g->ntname[a], ".x") || strchr(g->ntname[a], '[')))
+            printf("  (this rule comes from an exception '-')\n");
+        if (g->cyclic >= 0) {
+            printf("REJECTED: %s derives itself, so every string has infinitely many derivations\n",
+                   g->ntname[g->cyclic]);
+        } else if (g->ambiguous) {
+            printf("REJECTED: ambiguous, '%s' has two derivations:\n  %s\n  %s\n",
+                   g->ambig_string, g->ambig_tree1, g->ambig_tree2);
+        } else {
+            printf("parser: Earley\n");
+            if (g->probe_exhaustive)
+                printf("ambiguity probe: none; all %ld derivations of the finite language were checked\n",
+                       g->probe_trees);
+            else
+                printf("ambiguity probe: none found among %ld derivations up to size %d\n",
+                       g->probe_trees, g->probe_size);
+        }
+    }
     if (g->finite) {
         table_ensure(tb, g->max_size);
         gmp_printf("language: finite, %Zd strings, largest derivation size %d\n",
@@ -66,7 +95,7 @@ static int check(const Grammar *g, Table *tb)
     } else {
         printf("language: infinite\n");
     }
-    return g->ll1_ok ? 0 : 1;
+    return usable(g) ? 0 : 1;
 }
 
 static int usage(void)
@@ -95,7 +124,10 @@ int main(int argc, char **argv)
     table_init(&tb, &g);
 
     if (!strcmp(cmd, "check")) return check(&g, &tb);
-    if (!g.ll1_ok) die("refusing to number strings of an ambiguous grammar");
+    if (g.cyclic >= 0)
+        die("'%s' derives itself, so every string has infinitely many derivations", g.ntname[g.cyclic]);
+    if (g.ambiguous)
+        die("ambiguous grammar: '%s' has two derivations:\n  %s\n  %s", g.ambig_string, g.ambig_tree1, g.ambig_tree2);
 
     if (!strcmp(cmd, "rank") && argc == 4) {
         Tokens tk;

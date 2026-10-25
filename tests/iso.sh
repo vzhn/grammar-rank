@@ -75,18 +75,28 @@ printf 'S -> "x" S | "y"\n' > "$tmp/loose.txt"
 eq "loose syntax still works" "y xy xxy" "$("$CFG" list "$tmp/loose.txt" 3 | cut -f2 | tr -d ' ' | tr '\n' ' ' | sed 's/ $//')"
 
 # --- grammars that must be rejected ------------------------------------------
-printf 'aa = "A" ;\ncc = 3 * [aa], "C" ;\n' > "$tmp/cc.ebnf"          # ambiguous (standard 5.7)
-printf 'aa = "A" ;\ngg = 3 * {aa}, "D" ;\n' > "$tmp/gg.ebnf"          # ambiguous (standard 5.7, note)
-printf 'ident = { letter } - ( "A", "A" ) ;\nletter = "A" | "B" ;\n' > "$tmp/nonll1.ebnf"
+printf 'cc = 3 * [aa], "C" ;\naa = "A" ;\n' > "$tmp/cc.ebnf"          # ambiguous (standard 5.7)
+printf 'gg = 3 * {aa}, "D" ;\naa = "A" ;\n' > "$tmp/gg.ebnf"          # ambiguous (standard 5.7, note)
 printf 'S = ? anything ? ;\n' > "$tmp/special.ebnf"
 printf '(* never closed\nS = "a" ;\n' > "$tmp/comment.ebnf"
 printf 'S = "a" - T ;\nT = "b", T, "b" | "c" ;\n' > "$tmp/nonregular.ebnf"
 printf 'S = "a" - S ;\n' > "$tmp/self.ebnf"
 printf 'S = 3 "a" ;\n' > "$tmp/intnostar.ebnf"
 printf 'S = "a", ;\n' > "$tmp/trailingcomma.ebnf"
-for f in cc gg nonll1 special comment nonregular self intnostar trailingcomma; do rejects "$f" "$tmp/$f.ebnf"; done
-has "cc is ambiguous" "$("$CFG" check "$tmp/cc.ebnf" 2>&1)" "both predicted by A"
-has "nonll1 hint" "$("$CFG" check "$tmp/nonll1.ebnf" 2>&1)" "comes from an exception"
+for f in cc gg special comment nonregular self intnostar trailingcomma; do rejects "$f" "$tmp/$f.ebnf"; done
+has "cc is ambiguous" "$("$CFG" check "$tmp/cc.ebnf" 2>&1)" "REJECTED: ambiguous, 'A C' has two derivations"
+has "gg is ambiguous" "$("$CFG" check "$tmp/gg.ebnf" 2>&1)" "REJECTED: ambiguous"
+
+# --- an exception whose product is not LL(1) is parsed with Earley ----------
+printf 'ident = { letter } - ( "A", "A" ) ;\nletter = "A" | "B" ;\n' > "$tmp/nonll1.ebnf"
+chk=$("$CFG" check "$tmp/nonll1.ebnf" 2>&1)
+has "nonll1 accepted" "$chk" "parser: Earley"
+has "nonll1 hint" "$chk" "comes from an exception"
+for s in '' 'A' 'AAA' 'AB' 'BA' 'AAB'; do
+    if "$CFG" rank "$tmp/nonll1.ebnf" "$s" >/dev/null 2>&1; then ok; else bad "nonll1: '$s' rejected"; fi
+done
+if "$CFG" rank "$tmp/nonll1.ebnf" 'AA' >/dev/null 2>&1; then bad "nonll1: 'AA' accepted"; else ok; fi
+has "nonll1 selftest" "$("$CFG" selftest "$tmp/nonll1.ebnf" 2>&1 | tail -1)" "selftest OK"
 has "special sequence message" "$("$CFG" check "$tmp/special.ebnf" 2>&1)" "special sequences"
 has "comment message" "$("$CFG" check "$tmp/comment.ebnf" 2>&1)" "unterminated comment"
 has "nonregular message" "$("$CFG" check "$tmp/nonregular.ebnf" 2>&1)" "is not regular"

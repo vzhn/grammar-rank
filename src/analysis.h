@@ -3,8 +3,8 @@
 #include "grammar.h"
 
 /* Fill the derived fields of g: nullable, FIRST, FOLLOW, predict sets,
- * productivity, reachability, the LL(1) verdict (conflicts are reported on
- * stderr) and whether the language is finite. */
+ * productivity, reachability, the LL(1) verdict, whether the language is
+ * finite, and for non-LL(1) grammars the ambiguity checks. */
 void analyze(Grammar *g);
 
 #endif
