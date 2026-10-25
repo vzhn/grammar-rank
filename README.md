@@ -1,4 +1,4 @@
-# cfg-order
+# grammar-rank
 
 Every string of a context-free language gets a number, and every number
 gets a string back.
