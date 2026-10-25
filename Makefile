@@ -6,7 +6,7 @@ SRCS    = $(wildcard src/*.c)
 OBJS    = $(SRCS:.c=.o)
 HDRS    = $(wildcard src/*.h)
 
-GRAMMARS = expr.txt dyck.txt ebnf.txt ops.txt finite.txt iso-arith.ebnf exceptions.ebnf iso-14977.ebnf leftrec.txt palindrome.txt
+GRAMMARS = expr.txt dyck.txt ebnf.txt ops.txt finite.txt iso-arith.ebnf exceptions.ebnf iso-14977.ebnf leftrec.txt palindrome.txt lambda.ebnf
 
 cfg: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDLIBS)
@@ -18,6 +18,7 @@ test: cfg
 	sh tests/arithmetic.sh ./cfg
 	sh tests/iso.sh ./cfg
 	sh tests/earley.sh ./cfg
+	sh tests/lambda.sh ./cfg
 	sh tests/shapes.sh ./cfg
 	./cfg shape-selftest 7
 	for g in $(GRAMMARS); do ./cfg selftest grammars/$$g || exit 1; done

@@ -1,0 +1,18 @@
+(* Untyped lambda calculus in de Bruijn notation, ISO/IEC 14977 syntax.
+   "\" is abstraction and its body extends as far to the right as
+   possible; application is juxtaposition and associates to the left,
+   so "\ 0 1" is \(0 1) and "0 1 2" is (0 1) 2.  A variable is its de
+   Bruijn index: the number of binders between it and the one that
+   binds it, "\0" is the identity and "\\1" is K.
+
+   Indices are single digits.  Input is tokenized with whitespace
+   ignored, so "1 2" and "12" would be the same token sequence and a
+   multi-digit index could not be told from an application.
+
+   The grammar describes open terms as well: "every index is smaller
+   than its binder depth" is not a context-free condition. *)
+term        = abstraction | application ;
+abstraction = "\", term ;
+application = atom, { atom } ;
+atom        = index | "(", term, ")" ;
+index       = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
