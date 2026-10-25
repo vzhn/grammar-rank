@@ -19,7 +19,7 @@ idea and the grammar file syntax.
 
 ```
 make          # builds ./cfg, needs GMP (libgmp-dev / gmp-devel / dev-libs/gmp)
-make test     # tests/arithmetic.sh golden tests, then `cfg selftest` on every grammar
+make test     # tests/*.sh golden tests, `cfg shape-selftest 7`, then `cfg selftest` on every grammar
 make clean
 ```
 
@@ -40,6 +40,10 @@ src/enumerate.*  brute-force enumeration of derivation trees (memoized)
 src/ambiguity.*  self-derivation check and the ambiguity probe
 src/rank.*       rank() and unrank()
 src/selftest.*   oracle checks and round trips
+src/shape.*      grammar shapes (names erased, first-occurrence numbering), canonicalizer, printer
+src/shapetable.* the four-parameter counting table C(n, m, r, k), unweighted or weighted by P(sigma, k)
+src/shaperank.*  rank/unrank of shapes and of terminal spellings (k-permutations)
+src/shapecmd.*   the shape-* and grammar-* commands and `shape-selftest`
 src/main.c       command line and the `check` report
 grammars/        example grammars; ambig.txt, dangling.txt and cycle.txt are deliberately refused
 tests/           shell tests with golden values
@@ -48,9 +52,9 @@ tests/           shell tests with golden values
 ## Invariants
 
 - The numbering is part of the contract. A change that alters the index of
-  any string in an existing grammar is a breaking change: it must be
-  intentional, called out in the PR, and the golden values in `tests/` must be
-  updated in the same PR.
+  any string in an existing grammar, or the index of any shape or grammar,
+  is a breaking change: it must be intentional, called out in the PR, and
+  the golden values in `tests/` must be updated in the same PR.
 - `cfg selftest` is the oracle. New features in the loader or the counting
   code are not done until it passes on a grammar that exercises them, and
   such a grammar belongs in `grammars/` and in the `GRAMMARS` list of the

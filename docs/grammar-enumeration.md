@@ -1,5 +1,10 @@
 # Enumerating grammars
 
+Implemented in `src/shape.c` (canonical form, printing), `src/shapetable.c`
+(the counting table), `src/shaperank.c` (rank, unrank, permutations) and
+`src/shapecmd.c` (commands and self-test); golden values in
+`tests/shapes.sh`. The text below is the plan the implementation follows.
+
 Plan for numbering grammars themselves, the way `cfg rank` numbers the
 strings of one grammar. The index of a grammar must not depend on what its
 nonterminals are called or on the order of its rules in the file. It may
@@ -79,7 +84,8 @@ A shape is most easily counted as a sequence of actions:
 | `;` | end the current rule; one rule less is owed |
 
 The sequence starts inside the rule of nonterminal `0` with one rule owed and
-ends when a `;` brings the number of owed rules to zero. A rule has at least
+ends when a `;` brings the number of owed rules to zero, so `C(n, m, 0, k)`
+is `0` for `n > 0`. A rule has at least
 one alternative; an alternative may be empty. Because nonterminal `i`'s rule
 is written after every rule `< i`, and `i` was introduced inside one of
 those, every nonterminal is reachable by construction.
@@ -109,9 +115,12 @@ C(n, m, r, k) =  k · C(n-1, m,   r,   k)        T j, old terminal
 
 The table has `O(n⁴)` entries, each a sum of six terms, so no convolution
 and no product; it is much cheaper than the string tables. The number of
-shapes of size `n` is `C(n, 0, 1, 0)`, and `S(n, k)`, the number with exactly
-`k` terminals, is obtained by recording `k` at the end instead of summing
-over it.
+shapes of size `n` is `C(n, 0, 1, 0)`, and the number of grammars over an alphabet of size `σ` comes from the
+same recurrence with the base case `C(0, m, 0, k) = P(σ, k)` instead of
+`1`: each completed shape is then counted once per spelling, and shapes
+with more than `σ` terminals contribute nothing. The weighted table also
+gives, during the rank walk, the number of grammars whose shape precedes
+the given one, which is what the composition in section 6 needs.
 
 ### Rank and unrank
 

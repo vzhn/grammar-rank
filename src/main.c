@@ -8,6 +8,7 @@
  *   cfg list     G K [--tree] first K strings
  *   cfg count    G S          strings per size up to S
  *   cfg selftest G            brute force + round trips
+ *   cfg shape-* / grammar-*   enumerating grammars themselves, see shapecmd.c
  *
  * Input strings are tokenized by longest match against the terminals;
  * whitespace between tokens is ignored.
@@ -21,6 +22,7 @@
 #include "parser.h"
 #include "rank.h"
 #include "selftest.h"
+#include "shapecmd.h"
 #include "table.h"
 #include "tree.h"
 #include "util.h"
@@ -100,7 +102,10 @@ static int check(const Grammar *g, Table *tb)
 
 static int usage(void)
 {
-    fputs("usage: cfg check G | rank G STRING | unrank G N [--tree] | list G K [--tree] | count G S | selftest G\n",
+    fputs("usage: cfg check G | rank G STRING | unrank G N [--tree] | list G K [--tree] | count G S | selftest G\n"
+          "       cfg shape-rank G | shape-unrank N | shape-list K | shape-count S | shape-selftest S\n"
+          "       cfg grammar-rank G [--alphabet 'a b'] | grammar-unrank N --alphabet 'a b' [--names 'S A']\n"
+          "       cfg grammar-list K --alphabet 'a b' | grammar-count S --alphabet 'a b'\n",
           stderr);
     return 1;
 }
@@ -112,6 +117,8 @@ static void parse_number(mpz_t num, const char *s)
 
 int main(int argc, char **argv)
 {
+    int rc = shape_commands(argc, argv);
+    if (rc >= 0) return rc;
     if (argc < 3) return usage();
     const char *cmd = argv[1];
     int tree = argc > 3 && !strcmp(argv[argc - 1], "--tree");

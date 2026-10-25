@@ -48,6 +48,16 @@ cfg unrank   GRAMMAR N          the string with index N          (--tree shows t
 cfg list     GRAMMAR K          the first K strings               (--tree shows the derivations)
 cfg count    GRAMMAR S          how many strings of each derivation size up to S
 cfg selftest GRAMMAR            brute-force enumeration against rank and unrank
+
+cfg shape-rank     GRAMMAR                  the index of the grammar's shape
+cfg shape-unrank   N [--names 'S A B']      the N-th shape, printed as a grammar file
+cfg shape-list     K                        the first K shapes
+cfg shape-count    S                        how many shapes of each size up to S
+cfg grammar-rank   GRAMMAR [--alphabet 'a b']           the index of a grammar
+cfg grammar-unrank N --alphabet 'a b' [--names 'S A']   the grammar with index N
+cfg grammar-list   K --alphabet 'a b'                   the first K grammars
+cfg grammar-count  S --alphabet 'a b'                   how many grammars of each size up to S
+cfg shape-selftest S [--alphabet 'a b']                 brute force against the tables
 ```
 
 Indices are arbitrary-precision integers. A 300-digit index decodes in
@@ -209,6 +219,66 @@ For them the program knows the total number of strings and rejects larger
 indices instead of searching forever. For a finite language that is not
 LL(1) the ambiguity probe is exhaustive, so its verdict is a proof.
 
+## Enumerating grammars
+
+The same idea applies one level up: the grammars themselves can be
+numbered. The index of a grammar must not depend on what its nonterminals
+are called or on the order of its rules, so the thing that is ranked is the
+grammar's *shape*: read the rules from the start symbol in the order their
+nonterminals are first mentioned, alternatives in order, symbols left to
+right, and replace the i-th new nonterminal by `Ni` and the j-th new
+terminal by `tj`. This is the de Bruijn trick again, applied to grammars
+instead of lambda terms.
+
+```
+$ ./cfg shape-list 12
+0       N0 -> eps
+1       N0 -> 't0'
+2       N0 -> N0
+3       N0 -> eps | eps
+4       N0 -> 't0' 't0'
+5       N0 -> 't0' 't1'
+6       N0 -> 't0' N0
+7       N0 -> 't0' | eps
+8       N0 -> N0 't0'
+9       N0 -> N0 N0
+10      N0 -> N0 | eps
+11      N0 -> N1 ; N1 -> eps
+
+$ ./cfg grammar-rank grammars/expr.txt
+145898704048748911158
+
+$ ./cfg grammar-unrank 145898704048748911158 --alphabet '( ) * + x' --names 'E T E1 F T1'
+E -> T E1
+T -> F T1
+E1 -> '+' T E1 | eps
+F -> '(' E ')' | 'x'
+T1 -> '*' F T1 | eps
+```
+
+A shape is counted as a sequence of actions (write an old or a new
+terminal, write an old or a new nonterminal, end the alternative, end the
+rule); its size is the number of actions. A four-parameter table counts
+the completions of a partial sequence, and ranking is a walk along the
+sequence that adds up the completions of every action that would have
+come earlier. Unreachable rules are not part of the shape, and the program
+says so when it drops them.
+
+A grammar over an alphabet is a shape plus a *spelling*: which real
+terminal appeared first, which second, and so on. The spelling is a
+k-permutation of the alphabet, ranked in the factorial number system, and
+the grammars of one size are ordered shape-major, so consecutive indices
+are usually relabelings of the same structure. The alphabet has to be
+given, since the index over `{a, b}` differs from the index over
+`{a, b, c}`; `grammar-rank` defaults to the grammar's own terminals in
+sorted order. Nonterminal names are never part of the index; `--names`
+only chooses what `unrank` prints. The plan with the counting recurrence
+is in [docs/grammar-enumeration.md](docs/grammar-enumeration.md).
+
+Shapes make the analysis a survey tool: `shape-unrank` every shape up to
+some size and run `check` on it to count how many are LL(1), how many are
+ambiguous, how many describe finite languages.
+
 ## Testing
 
 `make test` runs two kinds of tests.
@@ -230,7 +300,13 @@ must be rejected, including the standard's ambiguous examples `cc` and
 `gg`. `tests/earley.sh` covers the non-LL(1) path: a left-recursive
 expression grammar, which accepts the same strings as `expr.txt` under a
 different numbering, odd palindromes, and the grammars that must be
-refused with their witnesses.
+refused with their witnesses. `tests/shapes.sh` covers the grammar
+enumeration: counts, the first shapes and grammars, indices of the example
+grammars, invariance under renaming and reordering rules, round trips
+through `unrank` and a file, and the rejected inputs. `cfg shape-selftest`
+enumerates every shape up to a given size straight from the action
+definition and checks the table counts, every rank and unrank, and the
+grammar index of every spelling over a small alphabet.
 
 ## Limitations
 
@@ -251,6 +327,10 @@ refused with their witnesses.
   spaces inside ISO meta-identifiers.
 - Decoding builds the full counting table up to the size of the result, so
   indices with thousands of digits take seconds and tens of megabytes.
+- The shape table is quartic in the size, so `grammar-unrank` of an index
+  with a few hundred digits takes seconds and hundreds of megabytes.
+- Grammars that differ only in the order of alternatives have different
+  shapes, as they have different numberings of their strings.
 
 ## Where this kind of thing is used
 

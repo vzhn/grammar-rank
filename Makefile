@@ -18,6 +18,8 @@ test: cfg
 	sh tests/arithmetic.sh ./cfg
 	sh tests/iso.sh ./cfg
 	sh tests/earley.sh ./cfg
+	sh tests/shapes.sh ./cfg
+	./cfg shape-selftest 7
 	for g in $(GRAMMARS); do ./cfg selftest grammars/$$g || exit 1; done
 
 clean:
