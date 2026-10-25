@@ -24,9 +24,12 @@ $ ./cfg unrank grammars/ebnf.txt 123456789012345678901234567890
 
 This is a recreational programming project. It started as the question
 "how would you order all lambda terms?", became a program that numbers
-closed de Bruijn terms, and then generalised to any LL(1) grammar. There
-is nothing here that is not in the literature from the 1980s, but it was
-fun to build and the pieces fit together nicely.
+closed de Bruijn terms, and then generalised to any LL(1) grammar.
+`grammars/lambda.ebnf` closes the loop: lambda terms in de Bruijn notation
+are one more grammar, open terms included, since "every index is below
+its binder depth" is not a context-free condition. There is nothing here that is
+not in the literature from the 1980s, but it was fun to build and the
+pieces fit together nicely.
 
 ## Building
 
@@ -297,7 +300,9 @@ round-trips indices 0 to 19999 and a few 13- to 50-digit numbers.
 
 `tests/arithmetic.sh` holds golden values for the ISO EBNF arithmetic
 grammar: counts, first strings, specific ranks and unranks, round trips,
-the tree view and rejected inputs. `tests/iso.sh` covers the ISO syntax:
+the tree view and rejected inputs. `tests/lambda.sh` does the same for the
+lambda calculus grammar, with the indices of I, K, S, Ω and Church 3.
+`tests/iso.sh` covers the ISO syntax:
 the strict and relaxed arithmetic grammars must agree on every index, the
 standard's repetition examples, exceptions, the standard's own grammar of
 EBNF from clause 8.1, alternative symbols, and a set of grammars that
