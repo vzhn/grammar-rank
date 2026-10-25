@@ -1,0 +1,6 @@
+# arithmetic expressions, LL(1)
+E  -> T E1
+E1 -> '+' T E1 | eps
+T  -> F T1
+T1 -> '*' F T1 | eps
+F  -> '(' E ')' | 'x'

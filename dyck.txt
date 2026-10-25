@@ -1,0 +1,2 @@
+# balanced parentheses; counts at size 2k+1 are the Catalan numbers
+S -> '(' S ')' S | eps
